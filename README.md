@@ -2,9 +2,11 @@
 
 > Like an elixir for skills — compose simple building blocks into powerful agent workflows
 
-Skillixer is a TypeScript DSL for composing agent skills into compound SKILL.md files. Instead of writing monolithic skills or copy-pasting sections together, you define small, focused skills and compose them functionally.
+Skillixer is a TypeScript DSL for composing agent skills into **SKILL.md** files. Instead of writing monolithic skills or copy-pasting sections together, you define small, focused skills and compose them functionally.
 
 **The key innovation:** An agent-based compiler that *understands* your composition and synthesizes coherent prose — not mechanical concatenation.
+
+**Output:** A single, well-structured SKILL.md file ready to use with Claude Code or any agent that uses markdown skills.
 
 ## Installation
 
@@ -16,40 +18,88 @@ npm install skillixer
 
 ## Quick Start
 
+Create a file called `investigation.forge.ts`:
+
 ```typescript
-import { skill, pipe, parallel, fork } from 'skillixer';
-import { compileWithAgent } from 'skillixer';
+import { skill, pipe, parallel } from 'skillixer';
 
 // Define focused skills
-const gatherLogs = skill({
-  name: 'gather-logs',
-  instructions: `Search application logs for errors and anomalies...`
+const searchLogs = skill({
+  name: 'search-logs',
+  instructions: `Search application logs for errors.
+
+  1. Identify time range
+  2. Filter by error level
+  3. Look for patterns`
 });
 
-const gatherMetrics = skill({
-  name: 'gather-metrics',
-  instructions: `Check CPU, memory, latency metrics...`
+const searchMetrics = skill({
+  name: 'search-metrics',
+  instructions: `Check system metrics for anomalies.
+
+  - CPU and memory
+  - Request latency
+  - Error rates`
 });
 
 const analyze = skill({
   name: 'analyze',
-  instructions: `Correlate findings to identify root cause...`
+  instructions: `Correlate findings to identify root cause.
+
+  1. Build timeline
+  2. Match errors with metrics
+  3. Identify trigger event`
 });
 
-// Compose them
-const workflow = pipe(
-  parallel(gatherLogs, gatherMetrics),  // Gather evidence concurrently
-  analyze                                 // Then analyze
+// Compose them: gather in parallel, then analyze
+export default pipe(
+  parallel(searchLogs, searchMetrics),
+  analyze
 );
-
-// Compile to SKILL.md
-const result = await compileWithAgent(workflow, {
-  name: 'incident-investigator',
-  description: 'Investigate production incidents'
-});
-
-console.log(result.content);
 ```
+
+Run the build:
+
+```bash
+skillixer build investigation.forge.ts -o ./skills
+```
+
+**Output:** `./skills/investigation.md` — a coherent skill document:
+
+```markdown
+---
+name: investigation
+description: ...
+---
+
+# Investigation
+
+Investigate issues by gathering evidence and analyzing findings.
+
+## Evidence Gathering
+
+Begin by simultaneously collecting information from multiple sources:
+
+**Search Application Logs:**
+1. Identify time range of interest
+2. Filter by error level
+3. Look for patterns and recurring issues
+
+**Check System Metrics:**
+- CPU and memory utilization
+- Request latency trends
+- Error rates and anomalies
+
+## Analysis
+
+After gathering evidence, correlate findings to identify root cause:
+
+1. Build a timeline of events
+2. Match error patterns with metrics anomalies
+3. Identify the trigger event
+```
+
+The compiler understands that `parallel()` means "do together" and creates natural prose that flows.
 
 ## Core Concepts
 
@@ -77,17 +127,13 @@ incident-response-all.skill
 
 **With Skillixer:**
 ```typescript
-// Compose from primitives
-pipe(
-  parallel(datadogSearch, githubSearch, slackSearch),
-  correlate,
-  fork({ when: 'critical', then: alertOncall, else: logFinding })
-)
+// Same building blocks → different workflows
+const quickTriage = pipe(parallel(logs, metrics), analyze);
+const deepDive = pipe(logs, metrics, analyze, document);
+const autoResponse = pipe(parallel(logs, metrics), analyze, fork({...}));
 ```
 
-### Agent Compilation
-
-The compiler doesn't just concatenate skills — it **understands** the composition:
+### How It Works
 
 ```
 ┌─────────────────┐
@@ -106,26 +152,30 @@ The compiler doesn't just concatenate skills — it **understands** the composit
          │
          ▼
 ┌─────────────────┐
-│    SKILL.md     │   Unified, well-structured skill
+│    SKILL.md     │   Ready-to-use skill document
 └─────────────────┘
 ```
 
-**Mechanical merge (bad):**
-```markdown
-## Step 1: Search Datadog
-Search logs...
+## CLI Commands
 
-## Step 2: Search GitHub
-Search commits...
-```
+```bash
+# Compile a .forge.ts file → SKILL.md
+skillixer build workflow.forge.ts
 
-**Agent synthesis (good):**
-```markdown
-## Evidence Gathering
+# Output to specific directory
+skillixer build workflow.forge.ts -o ./skills
 
-Begin by simultaneously collecting information from multiple sources:
-- Search Datadog for error logs and metrics anomalies
-- Check GitHub for recent deployments and commits
+# Preview without writing (dry-run)
+skillixer preview workflow.forge.ts
+
+# Watch mode - rebuild on changes
+skillixer watch workflow.forge.ts
+
+# Interactive wizard - Claude helps you compose
+skillixer wizard
+
+# Install a skill from GitHub
+skillixer add github:org/repo/path/skill.md
 ```
 
 ## Examples
@@ -171,28 +221,37 @@ export default pipe(
 
 ```typescript
 // Specialize a generic skill with config
-const myDatadog = hydrate(datadogSearch, {
-  services: ['api-gateway', 'user-service'],
+const prodDatadog = hydrate(datadogSearch, {
+  environment: 'production',
+  services: ['api', 'web', 'worker'],
   defaultTimeRange: '2h'
 });
 
-export default pipe(myDatadog, analyze);
+export default pipe(prodDatadog, analyze);
 ```
 
-## CLI
+### Same Skills → Different Workflows
 
-```bash
-# Compile a .forge.ts file to SKILL.md
-skillixer build workflow.forge.ts
+```typescript
+// Base skills
+const logs = skill({ name: 'logs', instructions: '...' });
+const metrics = skill({ name: 'metrics', instructions: '...' });
+const analyze = skill({ name: 'analyze', instructions: '...' });
+const alert = skill({ name: 'alert', instructions: '...' });
+const document = skill({ name: 'document', instructions: '...' });
 
-# Preview without writing (dry-run)
-skillixer preview workflow.forge.ts
+// Quick triage (fast, parallel)
+export const quickTriage = pipe(parallel(logs, metrics), analyze);
 
-# Output to specific directory
-skillixer build workflow.forge.ts -o ./skills
+// Deep investigation (thorough, sequential)
+export const deepInvestigation = pipe(logs, metrics, analyze, document);
 
-# Install a skill from GitHub
-skillixer add github:anthropics/skills/datadog-search.md
+// Auto-response (with conditional alerting)
+export const autoResponse = pipe(
+  parallel(logs, metrics),
+  analyze,
+  fork({ when: 'severity >= "warning"', then: alert, else: document })
+);
 ```
 
 ## Importing Skills
@@ -210,42 +269,45 @@ const datadogSearch = await importLocal('./skills/datadog-search.md');
 ```typescript
 import { importGitHub } from 'skillixer';
 
-const datadogSearch = await importGitHub('anthropics/skills/datadog-search.md');
-// Or with a specific ref
-const datadogSearch = await importGitHub('anthropics/skills/datadog-search.md@v1.0.0');
+const datadogSearch = await importGitHub('org/repo/skills/datadog-search.md');
+const specificVersion = await importGitHub('org/repo/skills/search.md@v1.0.0');
+```
+
+### From Any Git Repo
+
+```typescript
+import { importGit } from 'skillixer';
+
+const mySkill = await importGit('git:https://gitlab.com/org/repo.git/skills/my-skill.md');
 ```
 
 ## API Reference
 
 ### `skill(definition)`
 
-Create an inline skill:
-
 ```typescript
 const mySkill = skill({
   name: 'my-skill',           // Required
   description: 'What it does', // Optional
-  instructions: `...`,         // Required - the actual skill content
+  instructions: `...`,         // Required
   metadata: { version: '1.0' } // Optional
 });
 ```
 
 ### `pipe(...nodes)`
 
-Sequential composition — each skill builds on the previous:
+Sequential — each builds on the previous:
 
 ```typescript
 pipe(gather, analyze, report)
-// gather → analyze → report
 ```
 
 ### `parallel(...nodes)`
 
-Concurrent composition — skills run "simultaneously":
+Concurrent — all run "together":
 
 ```typescript
 parallel(searchA, searchB, searchC)
-// All three execute concurrently, results combined
 ```
 
 ### `fork(options)`
@@ -262,29 +324,24 @@ fork({
 
 ### `hydrate(node, config)`
 
-Inject configuration into a skill:
+Inject configuration:
 
 ```typescript
-hydrate(genericSearch, {
-  service: 'payments',
-  timeRange: '1h'
-})
+hydrate(genericSearch, { service: 'payments', timeRange: '1h' })
 ```
 
 ### `compileWithAgent(ast, options)`
 
-Compile a composition to SKILL.md:
+Compile to SKILL.md:
 
 ```typescript
 const result = await compileWithAgent(composition, {
   name: 'my-skill',
-  description: 'Optional description',
-  model: 'claude-sonnet-4-20250514',  // Optional
-  maxTokens: 4096                      // Optional
+  description: 'Optional description'
 });
 
-console.log(result.content);     // The SKILL.md content
-console.log(result.metadata);    // { model, inputTokens, outputTokens, skillCount, patterns }
+// result.content = the SKILL.md string
+// result.metadata = { model, inputTokens, outputTokens, skillCount, patterns }
 ```
 
 ## License

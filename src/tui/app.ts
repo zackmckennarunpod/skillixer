@@ -330,7 +330,12 @@ ${flavorText.welcome}
   /** Bind event handlers */
   private bindEvents(): void {
     // Global key handler
-    this.renderer.keyInput.on('keypress', (key: KeyEvent) => {
+    this.renderer.keyInput.on('keypress', (key: any) => {
+      // Update status with key for debugging
+      this.store.dispatch({
+        type: 'SET_STATUS',
+        message: `Key: ${key.name || key.raw || 'unknown'}`,
+      });
       this.handleKey(key);
     });
 
@@ -465,14 +470,38 @@ ${flavorText.welcome}
 export async function startApp(): Promise<void> {
   const app = new SkillixerApp();
 
+  // Ensure terminal is restored on any exit
+  const cleanup = () => {
+    try {
+      app.destroy();
+    } catch {
+      // Ignore cleanup errors
+    }
+    // Force restore terminal state
+    process.stdout.write('\x1b[?1000l'); // Disable mouse tracking
+    process.stdout.write('\x1b[?1002l'); // Disable mouse button tracking
+    process.stdout.write('\x1b[?1003l'); // Disable all mouse tracking
+    process.stdout.write('\x1b[?1006l'); // Disable SGR mouse mode
+    process.stdout.write('\x1b[?25h'); // Show cursor
+    process.stdout.write('\x1b[?1049l'); // Exit alternate screen
+    process.stdout.write('\x1b[0m'); // Reset colors
+  };
+
   process.on('SIGINT', () => {
-    app.destroy();
+    cleanup();
     process.exit(0);
   });
 
   process.on('SIGTERM', () => {
-    app.destroy();
+    cleanup();
     process.exit(0);
+  });
+
+  process.on('exit', cleanup);
+  process.on('uncaughtException', (err) => {
+    cleanup();
+    console.error('Uncaught exception:', err);
+    process.exit(1);
   });
 
   await app.start();

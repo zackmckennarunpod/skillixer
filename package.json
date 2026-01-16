@@ -14,6 +14,7 @@
     "build:tui": "bun build ./src/tui/index.ts --outdir ./dist/tui --target bun",
     "tui": "bun run ./src/tui/index.ts",
     "start": "bun run ./src/tui/index.ts",
+    "reset": "bun run ./src/tui/reset-terminal.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "typecheck": "tsc --noEmit",

@@ -36,4 +36,12 @@ export * from './core/index.js';
 export { compileWithAgent, previewCompilation, type CompileOptions, type CompileResult } from './compiler/index.js';
 
 // Resolvers
-export { importLocal, importGitHub, resolveLocal, resolveGitHub, parseSkillMd } from './resolve/index.js';
+export {
+  importLocal,
+  importGitHub,
+  importGit,
+  resolveLocal,
+  resolveGitHub,
+  resolveGit,
+  parseSkillMd,
+} from './resolve/index.js';

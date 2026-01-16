@@ -1,23 +1,27 @@
 #!/usr/bin/env bun
 /**
- * Skillforge CLI
+ * Skillixer CLI
  *
  * Build commands for composing and compiling skills.
  */
 import { parseArgs } from 'node:util';
 import { buildCommand } from './build.js';
 import { addCommand } from './add.js';
+import { watchCommand } from './watch.js';
+import { runWizard } from './wizard.js';
 
 const HELP = `
-skillforge - Compose and compile agent skills
+skillixer - Compose and compile agent skills
 
 USAGE:
-  skillforge <command> [options]
+  skillixer <command> [options]
 
 COMMANDS:
   build <file.forge.ts>    Compile a composition to SKILL.md
   preview <file.forge.ts>  Preview what would be compiled (dry-run)
-  add <source>             Install a skill from GitHub
+  watch <file.forge.ts>    Watch and rebuild on changes
+  wizard                   Interactive skill composition helper
+  add <source>             Install a skill from git/GitHub
 
 OPTIONS:
   -o, --out <dir>          Output directory (default: ./skills)
@@ -27,15 +31,17 @@ OPTIONS:
   -h, --help               Show this help message
 
 EXAMPLES:
-  skillforge build incident-response.forge.ts
-  skillforge build incident-response.forge.ts -o ./compiled
-  skillforge preview incident-response.forge.ts
-  skillforge add github:anthropics/skills/datadog-search.md
+  skillixer build incident-response.forge.ts
+  skillixer build incident-response.forge.ts -o ./compiled
+  skillixer preview incident-response.forge.ts
+  skillixer watch incident-response.forge.ts
+  skillixer wizard
+  skillixer add github:anthropics/skills/datadog-search.md
 
 COMPOSITION FILE FORMAT:
   A .forge.ts file exports a composition as default:
 
-  import { skill, pipe, parallel, fork, hydrate } from 'skillforge';
+  import { skill, pipe, parallel, fork, hydrate } from 'skillixer';
 
   const search = skill({
     name: 'search',
@@ -89,6 +95,20 @@ async function main() {
           name: values.name,
           description: values.description,
           dryRun: true,
+        });
+        break;
+
+      case 'watch':
+        await watchCommand(args[0], {
+          outDir: values.out!,
+          name: values.name,
+          description: values.description,
+        });
+        break;
+
+      case 'wizard':
+        await runWizard({
+          outputPath: args[0],
         });
         break;
 

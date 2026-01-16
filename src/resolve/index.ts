@@ -9,4 +9,11 @@ export {
   clearCache,
   type GitHubSource,
 } from './github.js';
+export {
+  resolveGit,
+  importGit,
+  parseGitRef,
+  clearGitCache,
+  type GitSource,
+} from './git.js';
 export { parseSkillMd } from './parse.js';
