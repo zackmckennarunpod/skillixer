@@ -384,7 +384,7 @@ export function generateDemoComposition(): CompositionNode {
               _tag: 'Skill',
               name: 'datadog-search',
               instructions: 'Search Datadog logs',
-              source: { type: 'github', owner: 'runpod', repo: 'skills', path: 'datadog.md' },
+              source: { type: 'github', owner: 'acme', repo: 'skills', path: 'datadog.md' },
             },
           },
           {
@@ -393,7 +393,7 @@ export function generateDemoComposition(): CompositionNode {
               _tag: 'Skill',
               name: 'github-search',
               instructions: 'Search GitHub',
-              source: { type: 'github', owner: 'runpod', repo: 'skills', path: 'github.md' },
+              source: { type: 'github', owner: 'acme', repo: 'skills', path: 'github.md' },
             },
           },
         ],
