@@ -15,6 +15,7 @@ import {
   type Skill,
   type CompositionNode,
 } from "./tui-state";
+import { searchGitHub } from "./github-search";
 
 // Colors
 const c = {
@@ -34,12 +35,42 @@ const c = {
 
 // Mock skills
 const SKILLS: Skill[] = [
-  { id: "1", name: "code-review", description: "Analyze and review code", source: "local" },
-  { id: "2", name: "test-writer", description: "Generate unit tests", source: "local" },
-  { id: "3", name: "doc-gen", description: "Create documentation", source: "local" },
-  { id: "4", name: "refactor", description: "Suggest refactoring", source: "local" },
-  { id: "5", name: "security", description: "Security analysis", source: "local" },
-  { id: "6", name: "perf", description: "Performance optimization", source: "local" },
+  {
+    id: "1",
+    name: "code-review",
+    description: "Analyze and review code",
+    source: "local",
+  },
+  {
+    id: "2",
+    name: "test-writer",
+    description: "Generate unit tests",
+    source: "local",
+  },
+  {
+    id: "3",
+    name: "doc-gen",
+    description: "Create documentation",
+    source: "local",
+  },
+  {
+    id: "4",
+    name: "refactor",
+    description: "Suggest refactoring",
+    source: "local",
+  },
+  {
+    id: "5",
+    name: "security",
+    description: "Security analysis",
+    source: "local",
+  },
+  {
+    id: "6",
+    name: "perf",
+    description: "Performance optimization",
+    source: "local",
+  },
 ];
 
 const LOGO = `${c.magenta}
@@ -51,6 +82,7 @@ const LOGO = `${c.magenta}
 ${c.reset}`;
 
 let state: State;
+let isSearching = false;
 
 function render(): void {
   console.clear();
@@ -87,7 +119,11 @@ function renderMain(): void {
 
   const items = [
     { key: "g", name: "Grimoire", desc: "Skill library" },
-    { key: "w", name: "Workspace", desc: `Installed skills (${state.workspace.length})` },
+    {
+      key: "w",
+      name: "Workspace",
+      desc: `Installed skills (${state.workspace.length})`,
+    },
     { key: "/", name: "Search", desc: "Find skills on GitHub" },
     { key: "c", name: "Compose", desc: "Build skill pipeline" },
     { key: "?", name: "Help", desc: "Show all commands" },
@@ -96,16 +132,22 @@ function renderMain(): void {
   items.forEach((item, i) => {
     const sel = i === state.selectedIndex;
     const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
-    const key = sel ? `${c.bgCyan}${c.bold} ${item.key} ${c.reset}` : `${c.cyan}[${item.key}]${c.reset}`;
+    const key = sel
+      ? `${c.bgCyan}${c.bold} ${item.key} ${c.reset}`
+      : `${c.cyan}[${item.key}]${c.reset}`;
     const name = sel ? `${c.bold}${c.cyan}${item.name}${c.reset}` : item.name;
-    console.log(`  ${arrow} ${key} ${name.padEnd(20)} ${c.dim}${item.desc}${c.reset}`);
+    console.log(
+      `  ${arrow} ${key} ${name.padEnd(20)} ${c.dim}${item.desc}${c.reset}`,
+    );
   });
 
   console.log(`\n${c.dim}  j/k navigate · Enter select · q quit${c.reset}`);
 }
 
 function renderGrimoire(): void {
-  console.log(`${c.bold}${c.magenta}📚 Grimoire${c.reset} ${c.dim}(skill library)${c.reset}\n`);
+  console.log(
+    `${c.bold}${c.magenta}📚 Grimoire${c.reset} ${c.dim}(skill library)${c.reset}\n`,
+  );
 
   if (state.localSkills.length === 0) {
     console.log(`  ${c.dim}No skills available${c.reset}`);
@@ -115,39 +157,61 @@ function renderGrimoire(): void {
       const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
       const installed = isSkillInWorkspace(state, skill.id);
       const mark = installed ? `${c.green}✓${c.reset}` : " ";
-      const name = sel ? `${c.bold}${c.cyan}${skill.name}${c.reset}` : skill.name;
-      console.log(`  ${arrow} ${mark} ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`);
+      const name = sel
+        ? `${c.bold}${c.cyan}${skill.name}${c.reset}`
+        : skill.name;
+      console.log(
+        `  ${arrow} ${mark} ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`,
+      );
     });
   }
 
-  console.log(`\n${c.dim}  j/k navigate · i install · p/a/f compose · Esc back${c.reset}`);
+  console.log(
+    `\n${c.dim}  j/k navigate · i install · p/a/f compose · Esc back${c.reset}`,
+  );
 }
 
 function renderWorkspace(): void {
-  console.log(`${c.bold}${c.cyan}🔧 Workspace${c.reset} ${c.dim}(installed skills)${c.reset}\n`);
+  console.log(
+    `${c.bold}${c.cyan}🔧 Workspace${c.reset} ${c.dim}(installed skills)${c.reset}\n`,
+  );
 
   if (state.workspace.length === 0) {
-    console.log(`  ${c.dim}Empty. Go to Grimoire [g] and install skills.${c.reset}`);
+    console.log(
+      `  ${c.dim}Empty. Go to Grimoire [g] and install skills.${c.reset}`,
+    );
   } else {
     state.workspace.forEach((skill, i) => {
       const sel = i === state.selectedIndex;
       const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
-      const name = sel ? `${c.bold}${c.cyan}${skill.name}${c.reset}` : skill.name;
+      const name = sel
+        ? `${c.bold}${c.cyan}${skill.name}${c.reset}`
+        : skill.name;
       const src = skill.source === "github" ? "  " : "📁";
-      console.log(`  ${arrow} ${src} ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`);
+      console.log(
+        `  ${arrow} ${src} ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`,
+      );
     });
   }
 
-  console.log(`\n${c.dim}  j/k navigate · x remove · p/a/f compose · Esc back${c.reset}`);
+  console.log(
+    `\n${c.dim}  j/k navigate · x remove · p/a/f compose · Esc back${c.reset}`,
+  );
 }
 
 function renderCompose(): void {
-  console.log(`${c.bold}${c.yellow}⚡ Compose${c.reset} ${c.dim}(build pipeline)${c.reset}\n`);
+  console.log(
+    `${c.bold}${c.yellow}⚡ Compose${c.reset} ${c.dim}(build pipeline)${c.reset}\n`,
+  );
 
   if (!state.composition) {
     console.log(`  ${c.dim}No composition yet.${c.reset}`);
-    console.log(`  ${c.dim}Go to Grimoire [g] or Workspace [w], select a skill,${c.reset}`);
-    console.log(`  ${c.dim}and press p (pipe), a (parallel), or f (fork).${c.reset}`);
+    console.log(
+      `  ${c.dim}Go to Grimoire [g] or Workspace [w], select a skill,${c.reset}`,
+    );
+    console.log(
+      `  ${c.dim}and press p (pipe), a (parallel), or f (fork).${c.reset}`,
+    );
   } else {
     console.log(renderTree(state.composition, 1));
   }
@@ -180,20 +244,33 @@ function renderTree(node: CompositionNode, depth: number): string {
 }
 
 function renderSearch(): void {
-  console.log(`${c.bold}${c.magenta}🔍 Search${c.reset}\n`);
-  console.log(`  ${c.cyan}Query:${c.reset} ${state.searchQuery}${c.dim}_${c.reset}`);
+  console.log(`${c.bold}${c.magenta}🔍 Search GitHub${c.reset}\n`);
+  console.log(
+    `  ${c.cyan}Query:${c.reset} ${state.searchQuery}${c.dim}_${c.reset}`,
+  );
 
-  if (state.searchResults.length > 0) {
+  if (isSearching) {
+    console.log(`\n  ${c.yellow}Searching GitHub...${c.reset}`);
+  } else if (state.searchResults.length > 0) {
     console.log(`\n  ${c.dim}Results:${c.reset}`);
     state.searchResults.forEach((skill, i) => {
       const sel = i === state.selectedIndex;
       const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
-      const name = sel ? `${c.bold}${c.cyan}${skill.name}${c.reset}` : skill.name;
-      console.log(`  ${arrow}   ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`);
+      const name = sel
+        ? `${c.bold}${c.cyan}${skill.name}${c.reset}`
+        : skill.name;
+      const desc = skill.description?.slice(0, 40) || "";
+      console.log(`  ${arrow}   ${name.padEnd(20)} ${c.dim}${desc}${c.reset}`);
     });
-    console.log(`\n${c.dim}  j/k navigate · i install · Esc back${c.reset}`);
+    console.log(
+      `\n${c.dim}  j/k navigate · i install · Enter open · Esc back${c.reset}`,
+    );
+  } else if (state.searchQuery) {
+    console.log(`\n  ${c.dim}Press Enter to search GitHub${c.reset}`);
   } else {
-    console.log(`\n${c.dim}  Type to search · Enter to submit · Esc back${c.reset}`);
+    console.log(
+      `\n  ${c.dim}Type to search · Enter to submit · Esc back${c.reset}`,
+    );
   }
 }
 
@@ -223,11 +300,41 @@ function renderHelp(): void {
   console.log(`\n${c.dim}  Press any key to close${c.reset}`);
 }
 
-function handleKey(key: string): boolean {
+async function handleKey(key: string): Promise<boolean> {
   const action = keyToAction(key, state);
 
   if (action?.type === "QUIT" || key === "\u0003") {
     return false;
+  }
+
+  // Handle async GitHub search
+  if (
+    action?.type === "SEARCH_SUBMIT" &&
+    state.mode === "search" &&
+    state.searchQuery
+  ) {
+    isSearching = true;
+    state = { ...state, statusMessage: "Searching GitHub..." };
+    render();
+
+    try {
+      const results = await searchGitHub(state.searchQuery);
+      state = {
+        ...state,
+        searchResults: results,
+        selectedIndex: 0,
+        statusMessage:
+          results.length > 0
+            ? `Found ${results.length} results`
+            : "No results found",
+      };
+    } catch (err) {
+      state = { ...state, statusMessage: `Search failed: ${err}` };
+    }
+
+    isSearching = false;
+    render();
+    return true;
   }
 
   if (action) {
@@ -253,8 +360,9 @@ async function main(): Promise<void> {
 
   render();
 
-  process.stdin.on("data", (key: string) => {
-    if (!handleKey(key)) {
+  process.stdin.on("data", async (key: string) => {
+    const shouldContinue = await handleKey(key);
+    if (!shouldContinue) {
       console.log(`\n${c.dim}Goodbye.${c.reset}\n`);
       process.exit(0);
     }
