@@ -4,7 +4,7 @@
  * Vim-style commands and hotkeys for spell weaving
  */
 
-import type { Store, ViewMode, InputMode } from './state.js';
+import type { Store } from './state.js';
 import { flavorText } from './theme.js';
 
 /** Hotkey mapping - direct and intuitive */
@@ -143,8 +143,7 @@ export const COMMANDS: Record<string, Command> = {
     aliases: ['compile', 'build', 'c'],
     description: 'Compile composition to SKILL.md',
     usage: ':forge [name]',
-    execute: async (store, args) => {
-      const name = args[0] ?? 'composition';
+    execute: async (store, _args) => {
       store.dispatch({ type: 'SET_STATUS', message: flavorText.forging });
       store.dispatch({ type: 'SET_LOADING', loading: true });
       // TODO: Compile and show result

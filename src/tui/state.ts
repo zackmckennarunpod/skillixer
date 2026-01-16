@@ -4,7 +4,7 @@
  * Centralized state management for the TUI
  */
 
-import type { CompositionNode, Skill } from '../core/types.js';
+import type { CompositionNode } from '../core/types.js';
 
 /** Available view modes */
 export type ViewMode =

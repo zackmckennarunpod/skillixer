@@ -11,6 +11,9 @@
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
     "build:cli": "bun build ./src/cli/index.ts --outdir ./dist/cli --target node",
+    "build:tui": "bun build ./src/tui/index.ts --outdir ./dist/tui --target bun",
+    "tui": "bun run ./src/tui/index.ts",
+    "start": "bun run ./src/tui/index.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "typecheck": "tsc --noEmit",
