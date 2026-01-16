@@ -1,68 +1,264 @@
+#!/usr/bin/env bun
+
 /**
  * Skillixer TUI
  *
- * The Arcane Skill Composition Forge
- *
- * A magical terminal interface for composing agent skills
- * with vim-style commands and visual effects.
+ * Flow: Grimoire (library) → install → Workspace → compose
  */
 
-export { SkillixerApp, startApp } from './app.js';
-export { Store, createInitialState, type AppState, type Action } from './state.js';
-export { colors, glyphs, modeIndicators, HELP_TEXT, flavorText } from './theme.js';
-export { HOTKEYS, COMMANDS, executeCommand, handleHotkey, parseCommand, findCommand } from './commands.js';
-export * from './ascii.js';
-export * from './effects.js';
+import {
+  createState,
+  reducer,
+  keyToAction,
+  isSkillInWorkspace,
+  type State,
+  type Skill,
+  type CompositionNode,
+} from "./tui-state";
 
-/** Reset terminal to clean state */
-function resetTerminal(): void {
-  process.stdout.write('\x1b[?1000l'); // Disable mouse tracking
-  process.stdout.write('\x1b[?1002l'); // Disable mouse button tracking
-  process.stdout.write('\x1b[?1003l'); // Disable all mouse tracking
-  process.stdout.write('\x1b[?1006l'); // Disable SGR mouse mode
-  process.stdout.write('\x1b[?25h'); // Show cursor
-  process.stdout.write('\x1b[?1049l'); // Exit alternate screen
-  process.stdout.write('\x1b[0m'); // Reset colors
+// Colors
+const c = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
+  white: "\x1b[37m",
+  gray: "\x1b[90m",
+  bgCyan: "\x1b[46m",
+  bgMagenta: "\x1b[45m",
+};
+
+// Mock skills
+const SKILLS: Skill[] = [
+  { id: "1", name: "code-review", description: "Analyze and review code", source: "local" },
+  { id: "2", name: "test-writer", description: "Generate unit tests", source: "local" },
+  { id: "3", name: "doc-gen", description: "Create documentation", source: "local" },
+  { id: "4", name: "refactor", description: "Suggest refactoring", source: "local" },
+  { id: "5", name: "security", description: "Security analysis", source: "local" },
+  { id: "6", name: "perf", description: "Performance optimization", source: "local" },
+];
+
+const LOGO = `${c.magenta}
+   _____ __   _ ____  _
+  / ___// /__(_) / / (_)  _____  _____
+  \\__ \\/ //_/ / / / / / |/_/ _ \\/ ___/
+ ___/ / ,< / / / / / />  </  __/ /
+/____/_/|_/_/_/_/_/_/_/|_|\\___/_/
+${c.reset}`;
+
+let state: State;
+
+function render(): void {
+  console.clear();
+  console.log(LOGO);
+
+  switch (state.mode) {
+    case "main":
+      renderMain();
+      break;
+    case "grimoire":
+      renderGrimoire();
+      break;
+    case "workspace":
+      renderWorkspace();
+      break;
+    case "compose":
+      renderCompose();
+      break;
+    case "search":
+      renderSearch();
+      break;
+    case "help":
+      renderHelp();
+      break;
+  }
+
+  // Status bar
+  console.log(`\n${c.dim}─────────────────────────────────────────${c.reset}`);
+  console.log(`${c.cyan}${state.statusMessage}${c.reset}`);
 }
 
-// Direct CLI entry point
-if (import.meta.main) {
-  const { startApp } = await import('./app.js');
+function renderMain(): void {
+  console.log(`${c.bold}Main Menu${c.reset}\n`);
 
-  console.log(`
-    ╔═══════════════════════════════════════════════════════════════════════════╗
-    ║                                                                           ║
-    ║   ███████╗██╗  ██╗██╗██╗     ██╗     ██╗██╗  ██╗███████╗██████╗          ║
-    ║   ██╔════╝██║ ██╔╝██║██║     ██║     ██║╚██╗██╔╝██╔════╝██╔══██╗         ║
-    ║   ███████╗█████╔╝ ██║██║     ██║     ██║ ╚███╔╝ █████╗  ██████╔╝         ║
-    ║   ╚════██║██╔═██╗ ██║██║     ██║     ██║ ██╔██╗ ██╔══╝  ██╔══██╗         ║
-    ║   ███████║██║  ██╗██║███████╗███████╗██║██╔╝ ██╗███████╗██║  ██║         ║
-    ║   ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝         ║
-    ║                                                                           ║
-    ║              ✧･ﾟ: *✧･ﾟ THE ARCANE SKILL FORGE ･ﾟ✧*:･ﾟ✧                    ║
-    ║                                                                           ║
-    ╚═══════════════════════════════════════════════════════════════════════════╝
-  `);
+  const items = [
+    { key: "g", name: "Grimoire", desc: "Skill library" },
+    { key: "w", name: "Workspace", desc: `Installed skills (${state.workspace.length})` },
+    { key: "/", name: "Search", desc: "Find skills on GitHub" },
+    { key: "c", name: "Compose", desc: "Build skill pipeline" },
+    { key: "?", name: "Help", desc: "Show all commands" },
+  ];
 
-  console.log('\n  ✧ Initializing the forge...\n');
-  console.log('  Press q to quit, ? for help\n');
-
-  // Ensure terminal is reset on any exit
-  process.on('exit', resetTerminal);
-  process.on('SIGINT', () => {
-    resetTerminal();
-    process.exit(0);
-  });
-  process.on('SIGTERM', () => {
-    resetTerminal();
-    process.exit(0);
+  items.forEach((item, i) => {
+    const sel = i === state.selectedIndex;
+    const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
+    const key = sel ? `${c.bgCyan}${c.bold} ${item.key} ${c.reset}` : `${c.cyan}[${item.key}]${c.reset}`;
+    const name = sel ? `${c.bold}${c.cyan}${item.name}${c.reset}` : item.name;
+    console.log(`  ${arrow} ${key} ${name.padEnd(20)} ${c.dim}${item.desc}${c.reset}`);
   });
 
-  try {
-    await startApp();
-  } catch (error) {
-    resetTerminal();
-    console.error('\n  ⊗ The spell has backfired:', error);
-    process.exit(1);
+  console.log(`\n${c.dim}  j/k navigate · Enter select · q quit${c.reset}`);
+}
+
+function renderGrimoire(): void {
+  console.log(`${c.bold}${c.magenta}📚 Grimoire${c.reset} ${c.dim}(skill library)${c.reset}\n`);
+
+  if (state.localSkills.length === 0) {
+    console.log(`  ${c.dim}No skills available${c.reset}`);
+  } else {
+    state.localSkills.forEach((skill, i) => {
+      const sel = i === state.selectedIndex;
+      const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
+      const installed = isSkillInWorkspace(state, skill.id);
+      const mark = installed ? `${c.green}✓${c.reset}` : " ";
+      const name = sel ? `${c.bold}${c.cyan}${skill.name}${c.reset}` : skill.name;
+      console.log(`  ${arrow} ${mark} ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`);
+    });
+  }
+
+  console.log(`\n${c.dim}  j/k navigate · i install · p/a/f compose · Esc back${c.reset}`);
+}
+
+function renderWorkspace(): void {
+  console.log(`${c.bold}${c.cyan}🔧 Workspace${c.reset} ${c.dim}(installed skills)${c.reset}\n`);
+
+  if (state.workspace.length === 0) {
+    console.log(`  ${c.dim}Empty. Go to Grimoire [g] and install skills.${c.reset}`);
+  } else {
+    state.workspace.forEach((skill, i) => {
+      const sel = i === state.selectedIndex;
+      const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
+      const name = sel ? `${c.bold}${c.cyan}${skill.name}${c.reset}` : skill.name;
+      const src = skill.source === "github" ? "  " : "📁";
+      console.log(`  ${arrow} ${src} ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`);
+    });
+  }
+
+  console.log(`\n${c.dim}  j/k navigate · x remove · p/a/f compose · Esc back${c.reset}`);
+}
+
+function renderCompose(): void {
+  console.log(`${c.bold}${c.yellow}⚡ Compose${c.reset} ${c.dim}(build pipeline)${c.reset}\n`);
+
+  if (!state.composition) {
+    console.log(`  ${c.dim}No composition yet.${c.reset}`);
+    console.log(`  ${c.dim}Go to Grimoire [g] or Workspace [w], select a skill,${c.reset}`);
+    console.log(`  ${c.dim}and press p (pipe), a (parallel), or f (fork).${c.reset}`);
+  } else {
+    console.log(renderTree(state.composition, 1));
+  }
+
+  console.log(`\n${c.dim}  g grimoire · w workspace · Esc back${c.reset}`);
+}
+
+function renderTree(node: CompositionNode, depth: number): string {
+  const pad = "  ".repeat(depth);
+  const lines: string[] = [];
+
+  if (node.type === "skill" && node.skill) {
+    lines.push(`${pad}${c.cyan}◆${c.reset} ${node.skill.name}`);
+  } else {
+    const labels: Record<string, string> = {
+      pipe: `${c.magenta}│ PIPE${c.reset} ${c.dim}(sequential)${c.reset}`,
+      parallel: `${c.green}║ PARALLEL${c.reset} ${c.dim}(concurrent)${c.reset}`,
+      fork: `${c.yellow}◇ FORK${c.reset} ${c.dim}(conditional)${c.reset}`,
+    };
+    lines.push(`${pad}${labels[node.type] ?? node.type}`);
+    node.children?.forEach((child, i) => {
+      const last = i === (node.children?.length ?? 0) - 1;
+      const branch = last ? "└" : "├";
+      const childLines = renderTree(child, 0).trim();
+      lines.push(`${pad}  ${c.dim}${branch}${c.reset} ${childLines}`);
+    });
+  }
+
+  return lines.join("\n");
+}
+
+function renderSearch(): void {
+  console.log(`${c.bold}${c.magenta}🔍 Search${c.reset}\n`);
+  console.log(`  ${c.cyan}Query:${c.reset} ${state.searchQuery}${c.dim}_${c.reset}`);
+
+  if (state.searchResults.length > 0) {
+    console.log(`\n  ${c.dim}Results:${c.reset}`);
+    state.searchResults.forEach((skill, i) => {
+      const sel = i === state.selectedIndex;
+      const arrow = sel ? `${c.cyan}▸${c.reset}` : " ";
+      const name = sel ? `${c.bold}${c.cyan}${skill.name}${c.reset}` : skill.name;
+      console.log(`  ${arrow}   ${name.padEnd(18)} ${c.dim}${skill.description}${c.reset}`);
+    });
+    console.log(`\n${c.dim}  j/k navigate · i install · Esc back${c.reset}`);
+  } else {
+    console.log(`\n${c.dim}  Type to search · Enter to submit · Esc back${c.reset}`);
   }
 }
+
+function renderHelp(): void {
+  console.log(`${c.bold}Help${c.reset}\n`);
+  console.log(`  ${c.cyan}Navigation${c.reset}`);
+  console.log(`    j/k or ↓/↑    Move down/up`);
+  console.log(`    Enter         Select`);
+  console.log(`    Esc           Back`);
+  console.log(`    q             Quit`);
+  console.log();
+  console.log(`  ${c.cyan}Views${c.reset}`);
+  console.log(`    g             Grimoire (skill library)`);
+  console.log(`    w             Workspace (installed)`);
+  console.log(`    /             Search GitHub`);
+  console.log(`    c             Compose view`);
+  console.log(`    ?             This help`);
+  console.log();
+  console.log(`  ${c.cyan}Skills${c.reset}`);
+  console.log(`    i             Install skill (in Grimoire)`);
+  console.log(`    x             Remove skill (in Workspace)`);
+  console.log();
+  console.log(`  ${c.cyan}Compose${c.reset}`);
+  console.log(`    p             Add to Pipe (sequential)`);
+  console.log(`    a             Add to All (parallel)`);
+  console.log(`    f             Add to Fork (conditional)`);
+  console.log(`\n${c.dim}  Press any key to close${c.reset}`);
+}
+
+function handleKey(key: string): boolean {
+  const action = keyToAction(key, state);
+
+  if (action?.type === "QUIT" || key === "\u0003") {
+    return false;
+  }
+
+  if (action) {
+    state = reducer(state, action);
+  }
+
+  render();
+  return true;
+}
+
+async function main(): Promise<void> {
+  if (!process.stdin.isTTY) {
+    console.log(LOGO);
+    console.log("Run in interactive terminal.");
+    process.exit(0);
+  }
+
+  state = createState(SKILLS);
+
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.setEncoding("utf8");
+
+  render();
+
+  process.stdin.on("data", (key: string) => {
+    if (!handleKey(key)) {
+      console.log(`\n${c.dim}Goodbye.${c.reset}\n`);
+      process.exit(0);
+    }
+  });
+}
+
+main().catch(console.error);
