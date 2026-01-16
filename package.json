@@ -1,0 +1,46 @@
+{
+  "name": "skillixer",
+  "version": "0.1.0",
+  "description": "TypeScript DSL for composing agent skills into compound SKILL.md files - like an elixir for skills",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "skillixer": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "build:cli": "bun build ./src/cli/index.ts --outdir ./dist/cli --target node",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit",
+    "eval": "bun run evals/run.ts"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "agent",
+    "skill",
+    "composition",
+    "dsl",
+    "claude"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@opentui/core": "^0.1.73",
+    "yaml": "^2.4.0"
+  }
+}
